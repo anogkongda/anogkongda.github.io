@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>银河赴约记 · 七夕</title>
+<style>
+  :root{
+    --night:#0b1c3f; --night-deep:#042C53; --river:#378ADD;
+    --star:#F5D76E; --cream:#FAEEDA; --capy:#EF9F27; --capy-line:#854F0B;
+    --pink:#ED93B1; --ink:#2C2C2A; --muted:#B4B2A9;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+    background:
+      linear-gradient(rgba(4,9,26,.44), rgba(4,9,26,.44)),
+      url('assets/scenes/night.webp') center/cover no-repeat fixed,
+      radial-gradient(ellipse 62% 38% at 18% 10%, rgba(83,74,183,.30), transparent 62%),
+      radial-gradient(ellipse 48% 34% at 84% 28%, rgba(55,138,221,.22), transparent 62%),
+      radial-gradient(ellipse 56% 42% at 50% 88%, rgba(148,79,157,.18), transparent 65%),
+      radial-gradient(ellipse 40% 30% at 8% 62%, rgba(55,138,221,.12), transparent 60%),
+      linear-gradient(180deg, #050d29 0%, #0b1c3f 42%, #071330 100%);
+    background-attachment: fixed, fixed, fixed, fixed, fixed, fixed, fixed;
+    background-color: #050d29;
+    color:var(--cream); overflow-x:hidden; line-height:1.7;
+  }
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* ===== 星空背景（canvas：分层星 + 闪烁 + 流星） ===== */
+  .sky{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .sky canvas{width:100%;height:100%;display:block}
+
+  main{position:relative;z-index:1}
+
+  /* ===== 鹊桥进度（sticky） ===== */
+  #bridge-bar{
+    position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;
+    padding:10px 16px;background:rgba(11,28,63,.82);backdrop-filter:blur(6px);
+    border-bottom:1px solid rgba(250,238,218,.12);
+    transform:translateY(-100%);transition:transform .5s;
+  }
+  #bridge-bar.show{transform:translateY(0)}
+  #bridge-bar .bb-label{font-size:12px;color:var(--muted);white-space:nowrap}
+  #bridge-segs{display:flex;gap:6px;flex:1}
+  .seg{height:8px;flex:1;border-radius:4px;background:rgba(250,238,218,.15);transition:background .6s, box-shadow .6s}
+  .seg.done{background:var(--star)}
+  .seg.final.done{background:var(--pink)}
+  #bridge-text{font-size:12px;color:var(--star);white-space:nowrap}
+  #music-btn{
+    border:1px solid rgba(250,238,218,.3);background:transparent;color:var(--cream);
+    border-radius:8px;padding:2px 10px;font-size:12px;cursor:pointer;
+  }
+
+  section{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 20px;position:relative}
+
+  h1{font-size:34px;font-weight:600;letter-spacing:6px;margin-bottom:8px;text-align:center}
+  .sub{color:var(--muted);font-size:14px;text-align:center}
+  .act-tag{font-size:12px;color:var(--star);letter-spacing:4px;margin-bottom:18px}
+
+  /* ===== 水豚 SVG 通用 ===== */
+  .capy-svg{overflow:visible}
+  .capy-img{width:100%;height:auto;display:block;filter:drop-shadow(0 4px 14px rgba(0,0,0,.4));border-radius:12px}
+  .meet-capy .capy-img{border-radius:18px}
+  .ph-cute{position:absolute;inset:0;background:var(--cream);display:flex;align-items:center;justify-content:center;gap:18px}
+  .ph-cute img{width:34%;border-radius:50%;background:#fff;padding:6px;box-sizing:border-box;filter:drop-shadow(0 4px 10px rgba(133,79,11,.25))}
+  .ph-cute .ph-text{position:absolute;left:0;right:0;text-align:center;font-size:14px}
+  .ph-cute .ph-text.t1{top:18px;color:var(--capy-line);font-weight:500}
+  .ph-cute .ph-text.t2{bottom:18px;color:#BA7517;font-size:12px}
+  .blink{animation:blink 4.5s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  .bob{animation:bob 3.2s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+  /* ===== 第一幕 ===== */
+  #act1 .river{
+    width:min(720px,92vw);margin:34px 0 26px;position:relative;
+  }
+  #act1 .capys{display:flex;justify-content:space-between;padding:0 4%}
+  #act1 .capy-wrap{position:relative;width:min(150px,30vw);cursor:pointer;transition:transform .3s}
+  #act1 .capy-wrap:active{transform:scale(.95)}
+  .capy-name{text-align:center;font-size:13px;color:var(--cream);margin-top:8px;letter-spacing:3px}
+  /* 点击引导：首次可见，点过一次即隐藏 */
+  .tap-hint{
+    position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+    background:var(--star);color:var(--capy-line);font-size:12px;
+    padding:3px 10px;border-radius:999px;white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);pointer-events:none;
+    animation:tapNudge 1.6s ease-in-out infinite;
+  }
+  .tap-hint::after{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
+    border:4px solid transparent;border-top-color:var(--star);border-bottom:none}
+  @keyframes tapNudge{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(4px)}}
+  .capy-wrap.tapped .tap-hint{display:none}
+  #countdown{font-size:15px;color:var(--star);margin:10px 0 30px;min-height:24px}
+  .btn-main{
+    font-size:16px;letter-spacing:3px;padding:13px 42px;border-radius:999px;cursor:pointer;
+    background:var(--cream);color:var(--capy-line);border:none;font-weight:600;
+    transition:transform .2s, box-shadow .2s;
+  }
+  .btn-main:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(250,238,218,.25)}
+  .scroll-hint{margin-top:26px;font-size:12px;color:var(--muted);animation:hintFloat 2s ease-in-out infinite}
+  @keyframes hintFloat{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(6px);opacity:1}}
+  .speech{
+    position:absolute;top:-44px;left:50%;transform:translateX(-50%);white-space:nowrap;
+    background:var(--cream);color:var(--capy-line);font-size:13px;padding:6px 14px;border-radius:12px;
+    opacity:0;pointer-events:none;transition:opacity .3s;z-index:5;
+  }
+  .speech::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);
+    border:6px solid transparent;border-top-color:var(--cream);border-bottom:none}
+
+  /* ===== 回忆卡（拍立得风） ===== */
+  .mcard{min-height:auto;padding:56px 20px}
+  .card{
+    width:min(680px,94vw);opacity:0;transform:translateY(46px) scale(.97);transition:opacity .8s ease,transform .8s ease;
+    background:#fdfaf3;border-radius:6px;padding:16px 16px 22px;
+    box-shadow:0 12px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+  }
+  .mcard:nth-child(odd) .card{transform:translateY(46px) scale(.97) rotate(-1.2deg)}
+  .mcard:nth-child(even) .card{transform:translateY(46px) scale(.97) rotate(1.1deg)}
+  .mcard.inview .card{opacity:1;transform:rotate(var(--tilt,0deg))}
+  .mcard:nth-child(odd).inview .card{--tilt:-1.2deg;transform:rotate(-1.2deg)}
+  .mcard:nth-child(even).inview .card{--tilt:1.1deg;transform:rotate(1.1deg)}
+  .card::before{  /* 胶带贴角 */
+    content:'';position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(-3deg);
+    width:110px;height:26px;background:rgba(245,215,110,.45);border-radius:2px;
+    box-shadow:0 1px 3px rgba(0,0,0,.15);
+  }
+  .card-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .card-no{font-size:12px;color:#BA7517;letter-spacing:2px}
+  .card-title{font-size:20px;font-weight:600;color:#5F5E5A}
+  .card-date{font-size:12px;color:#B4B2A9}
+  .card-cap{font-size:14px;color:#7c7a72;margin-bottom:14px}
+
+  .compare{
+    position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;
+    border:1px solid rgba(92,72,30,.25);background:#000;touch-action:pan-y;
+  }
+  .compare .side{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .compare .side img{width:100%;height:100%;object-fit:cover;display:block}
+  .compare .side svg{width:100%;height:100%}
+  #cute-side{z-index:2;clip-path:inset(0 0 0 50%)}
+  .divider{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--cream);z-index:3;pointer-events:none}
+  .divider::after{content:'⇆';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:34px;height:34px;border-radius:50%;background:var(--cream);color:var(--capy-line);
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .side-tag{position:absolute;top:10px;z-index:4;font-size:11px;padding:2px 10px;border-radius:8px;
+    background:rgba(11,28,63,.75);color:var(--cream);letter-spacing:2px}
+  .tag-real{left:10px}.tag-cute{right:10px}
+  .drag-zone{position:absolute;left:0;right:0;top:35%;height:30%;z-index:6;opacity:0;cursor:ew-resize;margin:0}
+
+  /* 拖动提示：手柄晃动 + 底部提示条，拖过一次即停 */
+  .mcard.inview .divider::after, .mcard.inview .mc-div::after{animation:nudge 1.8s ease-in-out infinite}
+  @keyframes nudge{
+    0%,100%{transform:translate(-50%,-50%)}
+    25%{transform:translate(calc(-50% - 9px),-50%)}
+    75%{transform:translate(calc(-50% + 9px),-50%)}
+  }
+  .drag-hint{
+    position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;
+    background:rgba(11,28,63,.82);color:var(--cream);font-size:11px;padding:3px 12px;
+    border-radius:10px;letter-spacing:1px;pointer-events:none;opacity:0;white-space:nowrap;
+  }
+  .mcard.inview .drag-hint{animation:hintShow 9s ease forwards}
+  @keyframes hintShow{0%{opacity:0}8%{opacity:1}75%{opacity:1}100%{opacity:0}}
+  .touched .divider::after, .touched .mc-div::after{animation:none}
+  .mcard.inview .touched .drag-hint, .touched .drag-hint{animation:none;opacity:0}
+
+  /* 双联卡（情人节）：每半是独立的迷你真实/萌化对照 */
+  .dual-compare{display:flex;align-items:center;gap:10px}
+  .dual-plus{font-size:24px;color:#BA7517;font-weight:600;flex-shrink:0;line-height:1}
+  .mini-cmp{flex:1;position:relative;border-radius:10px;overflow:hidden;background:#000;
+    border:1px solid rgba(92,72,30,.25);aspect-ratio:1/1.1;touch-action:pan-y}
+  .mini-cmp > img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .mini-cmp .side-tag{font-size:10px;padding:1px 7px}
+  .mc-cute{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
+  .mc-cute > img{width:100%;height:100%;object-fit:cover;display:block}
+  .mc-div{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--cream);z-index:3;pointer-events:none}
+  .mc-div::after{content:'⇆';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:26px;height:26px;border-radius:50%;background:var(--cream);color:var(--capy-line);
+    display:flex;align-items:center;justify-content:center;font-size:12px}
+  .mc-ph{width:100%;height:100%;background:var(--cream);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;color:var(--capy-line)}
+  .mc-ph b{font-size:14px}
+  .mc-ph span{font-size:11px;color:#BA7517}
+
+  /* ===== 喜鹊 ===== */
+  .magpie{
+    position:fixed;top:14vh;right:-140px;z-index:60;width:96px;pointer-events:none;
+    transition:none;display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  .magpie.fly{animation:flyin 5s cubic-bezier(.25,.6,.35,1) forwards}
+  @keyframes flyin{
+    0%{transform:translate(0,0) rotate(8deg);opacity:1}
+    20%{transform:translate(calc(-18vw - 40px),4vh) rotate(2deg);opacity:1}
+    80%{transform:translate(calc(-48vw - 50px),14vh) rotate(-4deg);opacity:1}
+    100%{transform:translate(calc(-58vw - 40px),19vh) rotate(-2deg);opacity:0}
+  }
+  .bubble{
+    background:var(--cream);color:var(--ink);font-size:13px;padding:8px 14px;border-radius:12px;
+    max-width:220px;opacity:0;transform:translateX(20px);transition:opacity .4s,transform .4s;
+    box-shadow:0 2px 10px rgba(0,0,0,.25);
+  }
+  .magpie.fly .bubble{opacity:1;transform:none;transition-delay:.8s}
+
+  /* ===== 第四幕 相会 ===== */
+  #act4{overflow:hidden}
+  #meet-stage{width:min(760px,94vw);position:relative;margin-top:20px}
+  #bridge-arc{stroke:#FAEEDA;stroke-width:10;stroke-linecap:round;fill:none;
+    stroke-dasharray:640;stroke-dashoffset:640;transition:stroke-dashoffset 1.6s ease;
+    filter:drop-shadow(0 0 8px rgba(250,238,218,.55))}
+  #bridge-arc-glow{stroke:rgba(245,215,110,.30);stroke-width:22;stroke-linecap:round;fill:none;
+    stroke-dasharray:640;stroke-dashoffset:640;transition:stroke-dashoffset 1.6s ease .08s}
+  #act4.inview #bridge-arc, #act4.inview #bridge-arc-glow{stroke-dashoffset:320}
+  /* 反转：喜鹊叫停 → 桥散开、水豚直接贴贴 */
+  #act4.no-bridge #bridge-arc, #act4.no-bridge #bridge-arc-glow{stroke-dashoffset:640;opacity:0;
+    transition:stroke-dashoffset 1.4s ease, opacity 1s ease .3s}
+  #act4.no-bridge #mc-l{left:calc(50% - var(--cw) + 16px)}
+  #act4.no-bridge #mc-r{right:calc(50% - var(--cw) + 16px)}
+  .meet-capy{--cw:min(130px,26vw);position:absolute;bottom:34px;width:var(--cw);
+    transition:transform 1.6s cubic-bezier(.6,0,.3,1), left 1.5s ease .2s, right 1.5s ease .2s}
+  #mc-l{left:6%;transform:translateX(-160%)}
+  #mc-r{right:6%;transform:translateX(160%)}
+  #act4.inview #mc-l,#act4.inview #mc-r{transform:translateX(0)}
+  #heart{position:absolute;left:50%;bottom:110px;transform:translateX(-50%) scale(0);z-index:5;
+    transition:transform .8s cubic-bezier(.2,1.6,.4,1) 1.5s}
+  #act4.inview #heart{transform:translateX(-50%) scale(1)}
+  .sparkle{position:absolute;width:10px;height:10px;background:var(--star);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);opacity:0}
+  #act4.inview .sparkle{animation:spk 2.2s ease-out infinite}
+  @keyframes spk{0%{opacity:0;transform:scale(.2) rotate(0)}40%{opacity:1}100%{opacity:0;transform:scale(1.3) rotate(90deg)}}
+  #meet-word{font-size:16px;color:var(--cream);margin-top:26px;opacity:0;transition:opacity 1s 1.8s;text-align:center}
+  #act4.inview #meet-word{opacity:1}
+
+  /* ===== 第五幕 视频 ===== */
+  .hero-video{position:relative;width:min(760px,94vw);aspect-ratio:16/9;margin:26px 0 8px;
+    border-radius:16px;overflow:hidden;background:#000;border:1px solid rgba(250,238,218,.25);
+    box-shadow:0 16px 50px rgba(0,0,0,.55)}
+  .hero-video video{width:100%;height:100%;object-fit:cover;display:block}
+  #v-sound{position:absolute;right:12px;bottom:12px;width:38px;height:38px;border-radius:50%;
+    border:1px solid rgba(250,238,218,.5);background:rgba(11,28,63,.7);color:var(--cream);
+    font-size:15px;cursor:pointer}
+  .v-hint{font-size:12px;color:var(--muted);margin-bottom:22px;letter-spacing:2px}
+  .cute-slot{width:min(320px,80vw);margin:6px 0 22px}
+  .vlabel{font-size:13px;margin-bottom:8px;color:var(--star);letter-spacing:2px}
+  .vframe{position:relative;aspect-ratio:9/12;border-radius:14px;overflow:hidden;background:#000;border:1px solid rgba(250,238,218,.2)}
+  .vframe video{width:100%;height:100%;object-fit:cover;display:block}
+  .vmiss{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
+    color:var(--muted);font-size:13px;padding:16px;text-align:center;background:rgba(4,44,83,.6)}
+  #final-word{font-size:15px;color:rgba(250,238,218,.9);text-align:center;max-width:560px}
+  footer{padding:40px 20px 60px;text-align:center;color:var(--muted);font-size:12px}
+
+  /* ===== 揭秘卡（钻戒）：点一下换真的 ===== */
+  .compare.rev{cursor:pointer}
+  .compare.rev .side-tag{transition:opacity .4s}
+  .rev-real{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .rev-cute{position:absolute;inset:0;z-index:2;transition:opacity .5s}
+  .rev-cute img{width:100%;height:100%;object-fit:cover;display:block}
+  .compare.rev.show-real .rev-cute{opacity:0}
+  .compare.rev.show-real .tag-cute{opacity:0}
+  .compare.rev:not(.show-real) .tag-real{opacity:0}
+  .compare.rev.show-real .drag-hint{opacity:0;animation:none}
+
+  /* ===== 第六幕 · 未来卡 ===== */
+  #act6 .card{opacity:0;transform:translateY(46px) scale(.97) rotate(-1.2deg);transition:opacity .8s ease,transform .8s ease}
+  #act6.inview .card{opacity:1;transform:rotate(-1.2deg)}
+  .future-body{margin-top:4px}
+  #wish-input{width:100%;border:1.5px dashed #BA7517;border-radius:10px;background:#fffdf6;
+    padding:12px 14px;font-size:15px;color:#2C2C2A;font-family:inherit;resize:none;line-height:1.7}
+  #wish-input:focus{outline:none;border-color:#EF9F27}
+  .btn-wish{display:block;margin:12px auto 0;background:#EF9F27;color:#fff;border:none;border-radius:999px;
+    padding:10px 30px;font-size:14px;letter-spacing:2px;cursor:pointer}
+  .wish-done{font-family:'Kaiti SC','STKaiti',cursive;font-size:22px;color:#5F5E5A;text-align:center;margin:8px 0 2px}
+  .wish-note{font-size:12px;color:#BA7517;text-align:center}
+
+  @media (max-width:520px){
+    h1{font-size:26px;letter-spacing:4px}
+    .card-title{font-size:17px}
+    .magpie{width:76px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01s !important;transition-duration:.2s !important}
+  }
+</style>
+</head>
+<body>
+<h2 class="sr-only">银河赴约记：喜鹊核查「一年一面」天条的执法记录——五份反证、一份现场实录，和一张还没发生的回忆卡</h2>
+<div class="sky" id="sky"></div>
+
+<div id="bridge-bar">
+  <span class="bb-label">违规记录</span>
+  <div id="bridge-segs"></div>
+  <span id="bridge-text">0/5</span>
+  <button id="music-btn" onclick="toggleMusic()">♪ 音乐</button>
+</div>
+
+<div class="magpie" id="magpie">
+  <div class="bubble" id="magpie-say">…</div>
+  <svg viewBox="0 0 140 84" width="96">
+    <path d="M96 52 l30 -8 l-10 10 l14 2 l-16 6 q-12 2 -18 -10Z" fill="#3C3489"/>  <!-- 分叉尾羽 -->
+    <ellipse cx="62" cy="44" rx="34" ry="17" fill="#26215C" stroke="#CECBF6" stroke-width="1.8"/>
+    <path d="M30 38 q14 12 30 10 q-8 8 -22 4 Z" fill="#EEEDFE"/>                        <!-- 白肚 -->
+    <path d="M52 34 q22 -20 46 -6 q-20 14 -46 6Z" fill="#3C3489" stroke="#534AB7" stroke-width="1"/> <!-- 收拢的翅 -->
+    <path d="M60 30 q26 -22 52 -8 q-22 16 -52 8Z" fill="#534AB7" opacity=".85"/>        <!-- 上层翅 -->
+    <circle cx="28" cy="34" r="12.5" fill="#26215C" stroke="#CECBF6" stroke-width="1.8"/>
+    <path d="M16.5 31 l-15 -4.5 l15 -3.5 Z" fill="#F5D76E"/>                             <!-- 金喙 -->
+    <circle cx="25.5" cy="31" r="2.4" fill="#fff"/>
+    <circle cx="25.5" cy="31" r="1.1" fill="#26215C"/>
+    <path d="M14 26 q6 -8 16 -5 l-3 4 q-7 -2 -13 1Z" fill="#3C3489"/>                    <!-- 头顶翎羽 -->
+    <path d="M54 58 q2 8 -2 12 M64 58 q2 8 -2 12" stroke="#F5D76E" stroke-width="2" fill="none" stroke-linecap="round"/> <!-- 金爪 -->
+  </svg>
+</div>
+
+<main>
+  <!-- 第一幕 -->
+  <section id="act1">
+    <p class="act-tag">第 一 幕</p>
+    <h1>银河赴约记</h1>
+    <p class="sub" id="subtitle">天条有云：一年一面 —— 本页负责证明，它与你们无关</p>
+    <div class="river">
+      <div class="capys">
+        <div class="capy-wrap" id="capy-l" onclick="sayHi('capy-l')">
+          <div class="tap-hint">点我 · 有话说</div>
+          <div class="speech" id="sp-capy-l"></div>
+          <img class="capy-img bob" src="assets/characters/lulu.png" alt="噜噜">
+          <div class="capy-name" id="name-l"></div>
+        </div>
+        <div class="capy-wrap" id="capy-r" onclick="sayHi('capy-r')">
+          <div class="tap-hint">点我 · 有话说</div>
+          <div class="speech" id="sp-capy-r"></div>
+          <img class="capy-img bob" src="assets/characters/lumei.png" alt="噜妹" style="animation-delay:1.2s">
+          <div class="capy-name" id="name-r"></div>
+        </div>
+      </div>
+      <svg viewBox="0 0 720 70" width="100%" style="display:block;margin-top:-26px">
+        <defs>
+          <filter id="glow" x="-40%" y="-200%" width="180%" height="500%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <linearGradient id="riverG" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#534AB7"/><stop offset=".5" stop-color="#378ADD"/><stop offset="1" stop-color="#534AB7"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="360" cy="38" rx="330" ry="16" fill="rgba(55,138,221,.12)"/>
+        <ellipse cx="360" cy="34" rx="260" ry="9" fill="rgba(83,74,183,.18)"/>
+        <path d="M6 26 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0" fill="none"
+          stroke="url(#riverG)" stroke-width="4.5" stroke-linecap="round" opacity=".55" filter="url(#glow)"/>
+        <path d="M6 36 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0" fill="none"
+          stroke="#8FD0FF" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="10 8" opacity=".9"/>
+        <path d="M6 46 q45 -14 90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0 t90 0" fill="none"
+          stroke="#378ADD" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 10" opacity=".5"/>
+        <g fill="#FAEEDA"><circle cx="120" cy="22" r="1.4"/><circle cx="240" cy="18" r="1.8" opacity=".8"/><circle cx="360" cy="24" r="1.3"/><circle cx="480" cy="19" r="1.7" opacity=".7"/><circle cx="600" cy="23" r="1.4"/></g>
+      </svg>
+      <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px">（银河 · 挡路中）</p>
+    </div>
+    <p id="countdown"></p>
+    <button class="btn-main" onclick="startJourney()">出示证据</button>
+    <p class="scroll-hint">↓ 往下滚，喜鹊已经在路上了</p>
+  </section>
+
+  <!-- 回忆卡由 JS 渲染到此处 -->
+  <div id="cards"></div>
+
+  <!-- 第四幕 -->
+  <section id="act4">
+    <p class="act-tag">第 四 幕</p>
+    <h1 style="font-size:26px">相 会</h1>
+    <div id="meet-stage">
+      <svg viewBox="0 0 760 220" width="100%" style="display:block">
+        <path id="bridge-arc-glow" d="M30 200 Q380 40 730 200"/>
+        <path id="bridge-arc" d="M30 200 Q380 40 730 200"/>
+      </svg>
+      <div class="meet-capy" id="mc-l">
+        <img class="capy-img" src="assets/characters/lulu.png" alt="噜噜">
+      </div>
+      <div class="meet-capy" id="mc-r">
+        <img class="capy-img" src="assets/characters/lumei.png" alt="噜妹">
+      </div>
+      <svg id="heart" viewBox="0 0 60 56" width="52">
+        <path d="M30 50 C10 36 2 24 2 15 C2 6 10 0 18 0 C24 0 29 4 30 9 C31 4 36 0 42 0 C50 0 58 6 58 15 C58 24 50 36 30 50Z" fill="#ED93B1"/>
+      </svg>
+    </div>
+    <p id="meet-word">桥搭到一半，喜鹊突然折返了……</p>
+  </section>
+
+  <!-- 第五幕 -->
+  <section id="act5">
+    <p class="act-tag">第 五 幕 · 现 场 实 录</p>
+    <h1 style="font-size:26px">最后一份证据</h1>
+    <p class="sub">无人机从银河那头飞来——拍到你们根本没在等七夕</p>
+    <div class="hero-video">
+      <video id="v-real" muted loop playsinline preload="metadata"></video>
+      <div class="vmiss" id="miss-real">视频占位<br>放入 assets/videos/proposal.mp4</div>
+      <button id="v-sound" onclick="toggleVidSound()" aria-label="开启声音">♪</button>
+    </div>
+    <p class="v-hint">—— 2026.05.22 · 阿拉善 · 沙丘顶</p>
+    <div class="cute-slot" id="cute-slot" style="display:none">
+      <p class="vlabel">彩蛋 · 水豚版《桥通的一刻》</p>
+      <div class="vframe">
+        <video id="v-cute" controls muted playsinline preload="metadata"></video>
+        <div class="vmiss" id="miss-cute">SeedDance 视频占位<br>放入 assets/videos/cute.mp4</div>
+      </div>
+    </div>
+    <p id="final-word">证据提交完毕。至于天条——本鹊可以装没看见。</p>
+  </section>
+
+  <!--
+  第六幕「未完待续 · 喜鹊叼走愿望」暂缓启用 —— 用户随时取消注释即可恢复
+  对应资源：textarea 输入 + localStorage 存档 + server.py POST /api/wish 落盘
+  <section id="act6">
+    <p class="act-tag">第 六 幕 · 未 完 待 续</p>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-no">反证 · 06</span>
+        <span class="card-title">还没发生的一张</span>
+        <span class="card-date">2026 · 下半年</span>
+      </div>
+      <p class="card-cap">前五张都是过去，这一格是空的。写一件下半年想一起做的事——写完，喜鹊叼走备案。</p>
+      <div class="future-body" id="future-body">
+        <textarea id="wish-input" rows="3" maxlength="60" placeholder="比如：去看一次海 · 把乌萨奇烧出来 · 换个地方看星星……"></textarea>
+        <button class="btn-wish" onclick="submitWish()">让喜鹊叼走</button>
+      </div>
+    </div>
+  </section>
+  -->
+
+  <footer>银河赴约记 · <span id="year"></span> 七夕 · 规矩是别人的</footer>
+</main>
+
+<script>
+/* ======================================================
+   CONFIG —— 所有可自定义内容都在这里改
+   ====================================================== */
+const CONFIG = {
+  names: { left:'噜噜', right:'噜妹' },           // 角色名（用官方 IP 名）
+  qixiDate: '2026-08-19',                         // 七夕日期（用于倒计时）
+  musicSrc: 'assets/music.mp3',                   // 背景音乐，没有就留空 ''
+  // 回忆卡：按时间线从早到晚 5 张；type='dual' 表示双联卡（不走滑块）
+  // 缺图时 realSrc 留空，渲染占位
+  cards: [
+    { type:'single', title:'第一张「试装」', date:'2023.12',
+      caption:'刚化完妆，两个人都精致得像要去拍婚照——也是从那时起开始胖的。',
+      realSrc:'assets/photos/real-1.jpg', cuteSrc:'assets/photos/cute-1.webp',
+      magpie:'记录在案：2023年12月，第一次违规——还化了妆' },
+
+    { type:'single', title:'溯溪·只是冲了冲脚', date:'2024.07',
+      caption:'那天时阴、时雨、时晴。别人全身湿透，我们就冲了冲脚——主打一个参与感。',
+      realSrc:'assets/photos/real-2.jpg', cuteSrc:'assets/photos/cute-2.webp',
+      magpie:'2024年7月，第二次。冲脚也算见面，本鹊记下了' },
+
+    { type:'dual', title:'情人节·一起玩泥巴', date:'2026.02.14',
+      caption:'我捏了一只乌萨奇，你捏了一对线条小狗。老师看了直摇头，我们捏得很开心。',
+      realSrcL:'assets/photos/real-3-l.jpg', realSrcR:'assets/photos/real-3-r.jpg',
+      cuteSrcL:'assets/photos/cute-3-l.webp', cuteSrcR:'assets/photos/cute-3-r.webp',
+      cuteLabelL:'噜噜', cuteLabelR:'噜妹',
+      magpie:'情人节不归我管，但把泥巴捏成一对……性质恶劣' },
+
+    { type:'single', title:'腾格里·乌兰湖的粉', date:'2026.05.22',
+      caption:'五湖穿越最惊艳的一站——乌兰湖。沙漠把湖腌成了粉色，我们在湖边站了很久。',
+      realSrc:'assets/photos/real-4.jpg', cuteSrc:'assets/photos/cute-4.webp',
+      magpie:'2026年5月，沙漠。银河的宽度对你们不起作用是吧' },
+
+    { type:'reveal', title:'那晚你说了「我愿意」', date:'2026.05.24',
+      caption:'生日、钻戒、99 朵玫瑰。这一张不设滑块——点一下，看看真的。',
+      realSrc:'assets/photos/meet.jpg', cuteSrc:'assets/photos/cute-5.webp',
+      magpie:'距上一条记录仅隔两天，戒指都到位了。本鹊……记不动了' }
+  ],
+  // 第五幕压轴视频：无人机航拍 · 沙丘顶求婚
+  videos: {
+    real: 'assets/videos/proposal.mp4',             // 无人机航拍求婚（已就位）
+    cute: 'assets/videos/cute.mp4'                  // 水豚版求婚（SeedDance 可选彩蛋，留空则隐藏）
+  },
+  // 开场点击水豚的台词
+  capyQuotes: {
+    left:['明明常见面，怎么还是想你','规矩管不了我们','戒指戴好了吗','就等你了'],
+    right:['才分开几天，又想见你了','我手凉了……你来牵','沙子还没洗干净呢','别催！马上就到']
+  },
+  // 第六幕愿望的落盘接口：server.py 提供 POST /api/wish（记录到服务端 data/wishes.jsonl）。
+  // 纯静态托管（GitHub Pages 等）下此接口不可用，页面自动降级为仅 localStorage，不影响体验。
+  wishEndpoint: 'api/wish'
+};
+
+/* ============ 渲染 ============ */
+const setText = (id, v) => { const el = document.getElementById(id); if (el && v) el.textContent = v; };
+setText('year', new Date(CONFIG.qixiDate).getFullYear());
+setText('name-l', CONFIG.names.left);
+setText('name-r', CONFIG.names.right);
+
+// 倒计时（按七夕当天 00:00 起算：七夕一到，就是相会之夜）
+(function(){
+  const el = document.getElementById('countdown');
+  const now = new Date(); const qx = new Date(CONFIG.qixiDate + 'T00:00:00');
+  const days = Math.ceil((qx - now) / 86400000);
+  if (days >= 1) el.textContent = `距离相会还有 ${days} 天`;
+  else if (days >= 0) el.textContent = '今夜，就是相会之夜';
+  else el.textContent = '今年的桥已经通行';
+})();
+
+// 星空（canvas：三层星 + 闪烁漂移 + 随机流星）
+(function(){
+  const sky = document.getElementById('sky');
+  const cv = document.createElement('canvas');
+  sky.appendChild(cv);
+  const ctx = cv.getContext('2d');
+  let W, H, stars = [], meteors = [], dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize(){
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.min(150, Math.floor(W * H / 11000));
+    stars = Array.from({length:n}, ()=>{
+      const layer = Math.random();
+      return {
+        x: Math.random()*W, y: Math.random()*H,
+        r: layer < .7 ? .5 + Math.random()*.6 : layer < .92 ? .9 + Math.random()*.7 : 1.4 + Math.random()*.9,
+        base: .18 + Math.random()*.35,
+        amp: .08 + Math.random()*.22,
+        sp: .5 + Math.random()*1.4,
+        ph: Math.random()*Math.PI*2,
+        hue: Math.random() < .12 ? '#F5D76E' : '#FFFFFF',
+        drift: layer >= .92 ? .04 + Math.random()*.04 : .006
+      };
+    });
+  }
+  function newMeteor(){
+    const x = W*.15 + Math.random()*W*.75;
+    meteors.push({x, y: -20, vx: -(2.4+Math.random()*1.6), vy: (3.2+Math.random()*1.8), life: 1});
+  }
+  let meteorClock = 0;
+  function draw(t){
+    ctx.clearRect(0,0,W,H);
+    for (const s of stars){
+      const tw = s.base + s.amp * Math.sin(t*.001*s.sp + s.ph);
+      s.x -= s.drift; if (s.x < -2) s.x = W + 2;
+      ctx.globalAlpha = Math.max(0, Math.min(1, tw));
+      ctx.fillStyle = s.hue;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
+      if (s.r > 1.8){                                  // 大星带十字光芒
+        ctx.globalAlpha *= .5;
+        ctx.fillRect(s.x - s.r*3, s.y - .4, s.r*6, .8);
+        ctx.fillRect(s.x - .4, s.y - s.r*3, .8, s.r*6);
+      }
+    }
+    meteorClock += 16;
+    if (meteorClock > 6000 + Math.random()*5000){ meteorClock = 0; newMeteor(); }
+    for (let i = meteors.length-1; i >= 0; i--){
+      const m = meteors[i];
+      m.x += m.vx; m.y += m.vy; m.life -= .008;
+      if (m.life <= 0 || m.y > H + 60){ meteors.splice(i,1); continue; }
+      const g = ctx.createLinearGradient(m.x, m.y, m.x - m.vx*14, m.y - m.vy*14);
+      g.addColorStop(0, `rgba(250,238,218,${.9*m.life})`);
+      g.addColorStop(1, 'rgba(250,238,218,0)');
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = g; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(m.x - m.vx*14, m.y - m.vy*14); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', resize);
+  resize(); requestAnimationFrame(draw);
+})();
+
+// 占位 SVG（真实侧 / 萌化侧）
+function phReal(label){
+  return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="300" fill="#B5D4F4"/>
+    <circle cx="330" cy="62" r="26" fill="#FAC775"/>
+    <path d="M0 230 L110 120 L220 230 Z" fill="#85B7EB"/>
+    <path d="M150 230 L300 96 L450 230 Z" fill="#378ADD"/>
+    <rect y="224" width="400" height="76" fill="#185FA5"/>
+    <g fill="#042C53"><circle cx="185" cy="182" r="10"/><rect x="177" y="190" width="16" height="36" rx="7"/>
+    <circle cx="222" cy="178" r="11"/><rect x="213" y="186" width="18" height="40" rx="8"/></g>
+    <rect x="20" y="20" width="360" height="34" rx="8" fill="rgba(4,44,83,.72)"/>
+    <text x="200" y="43" text-anchor="middle" font-size="16" fill="#FAEEDA">${label} · 真实照片位</text>
+    <text x="200" y="275" text-anchor="middle" font-size="13" fill="#CECBF6">替换：assets/photos/ 中放入照片后在 CONFIG 填路径</text>
+  </svg>`;
+}
+function phCute(label){
+  return `<div class="ph-cute">
+    <img src="assets/characters/lulu.png" alt="牛郎豚">
+    <img src="assets/characters/lumei.png" alt="织女豚">
+    <div class="ph-text t1">${label} · 萌化位</div>
+    <div class="ph-text t2">把真实照片用即梦转成水豚风后替换此处</div>
+  </div>`;
+}
+
+// 渲染回忆卡
+(function(){
+  const wrap = document.getElementById('cards');
+  const cmps = [];   // { cute, div, rg } 待绑定
+
+  wrap.innerHTML = CONFIG.cards.map((c,i)=>{
+    const head = `
+      <div class="card-head">
+        <span class="card-no">反证 · ${String(i+1).padStart(2,'0')}</span>
+        <span class="card-title">${c.title}</span>
+        <span class="card-date">${c.date}</span>
+      </div>`;
+
+    if (c.type === 'reveal'){
+      return `<section class="mcard" id="card-${i}">
+        <div class="card">${head}
+          <p class="card-cap">${c.caption}</p>
+          <div class="compare rev" id="rev-${i}" onclick="this.classList.toggle('show-real')" role="button" aria-label="点击切换真实或萌化版本">
+            <img class="rev-real" src="${c.realSrc}" alt="${c.title} 真实照片">
+            <div class="rev-cute">${c.cuteSrc ? `<img src="${c.cuteSrc}" alt="${c.title} 萌化版">` : ''}</div>
+            <span class="side-tag tag-real">真实档</span>
+            <span class="side-tag tag-cute">萌化档</span>
+            <span class="drag-hint">点一下 · 换真的</span>
+          </div>
+        </div>
+      </section>`;
+    }
+
+    if (c.type === 'dual'){
+      const pane = (side) => {          // side: 'L' | 'R'
+        const real = side === 'L' ? c.realSrcL : c.realSrcR;
+        const cute = side === 'L' ? c.cuteSrcL : c.cuteSrcR;
+        const label = side === 'L' ? (c.cuteLabelL || '萌化版') : (c.cuteLabelR || '萌化版');
+        return `<div class="mini-cmp">
+          <img src="${real}" alt="${c.title} 真实">
+          <div class="mc-cute" id="mc-cute-${i}-${side}">
+            ${cute ? `<img src="${cute}" alt="${label}">` : `<div class="mc-ph"><b>${label}</b><span>即梦生成后替换</span></div>`}
+          </div>
+          <div class="mc-div" id="mc-div-${i}-${side}"></div>
+          <span class="side-tag tag-real">真实</span>
+          <span class="side-tag tag-cute">${label}</span>
+          <span class="drag-hint">◀ 拖动 ▶</span>
+          <input class="drag-zone" type="range" min="0" max="100" value="50" id="mc-rg-${i}-${side}"
+            aria-label="拖动查看真实或萌化版">
+        </div>`;
+      };
+      cmps.push(['mc-cute-'+i+'-L','mc-div-'+i+'-L','mc-rg-'+i+'-L']);
+      cmps.push(['mc-cute-'+i+'-R','mc-div-'+i+'-R','mc-rg-'+i+'-R']);
+      return `<section class="mcard" id="card-${i}">
+        <div class="card dual-card">${head}
+          <p class="card-cap">${c.caption}</p>
+          <div class="dual-compare">${pane('L')}<div class="dual-plus">+</div>${pane('R')}</div>
+        </div>
+      </section>`;
+    }
+
+    cmps.push(['cute-side-'+i,'div-'+i,'rg-'+i]);
+    return `<section class="mcard" id="card-${i}">
+      <div class="card">${head}
+        <p class="card-cap">${c.caption}</p>
+        <div class="compare" id="cmp-${i}">
+          <div class="side">${c.realSrc ? `<img src="${c.realSrc}" alt="${c.title} 真实照片">` : phReal(c.title)}</div>
+          <div class="side" id="cute-side-${i}">${c.cuteSrc ? `<img src="${c.cuteSrc}" alt="${c.title} 萌化版">` : phCute(c.title)}</div>
+          <div class="divider" id="div-${i}"></div>
+          <span class="side-tag tag-real">真实档</span>
+          <span class="side-tag tag-cute">萌化档</span>
+          <span class="drag-hint">◀ 拖动 · 左右切换 真实/萌化 ▶</span>
+          <input class="drag-zone" type="range" min="0" max="100" value="50" id="rg-${i}"
+            aria-label="拖动查看真实或萌化版本">
+        </div>
+      </div>
+    </section>`;
+  }).join('');
+
+  // 统一绑定：修复此前所有卡片共用 id=cute-side 导致只有第一张卡能拖的问题
+  cmps.forEach(([cuteId, divId, rgId])=>{
+    const cute = document.getElementById(cuteId), dv = document.getElementById(divId), rg = document.getElementById(rgId);
+    if (!cute || !dv || !rg) return;
+    const upd = v => { cute.style.clipPath = `inset(0 0 0 ${v}%)`; dv.style.left = v + '%'; };
+    rg.addEventListener('input', e => {
+      upd(e.target.value);
+      // 拖过一次后，停止手柄晃动并隐藏提示条
+      rg.closest('.compare, .mini-cmp')?.classList.add('touched');
+    });
+    upd(50);
+  });
+})();
+
+/* ============ 滚动叙事 ============ */
+const bar = document.getElementById('bridge-bar');
+const segsBox = document.getElementById('bridge-segs');
+const total = CONFIG.cards.length + 1;   // 卡片数 + 相会
+segsBox.innerHTML = Array.from({length:total},(_,i)=>`<div class="seg${i===total-1?' final':''}" id="seg-${i}"></div>`).join('');
+let unlocked = new Set();
+
+function unlock(i){
+  if (unlocked.has(i)) return;
+  unlocked.add(i);
+  document.getElementById('seg-'+i).classList.add('done');
+  const t = document.getElementById('bridge-text');
+  t.textContent = unlocked.size >= total ? '五条全齐' : `${unlocked.size}/${total}`;
+}
+
+const io = new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if (!e.isIntersecting) return;
+    e.target.classList.add('inview');
+    if (e.target.classList.contains('mcard')){
+      const i = +e.target.id.split('-')[1];
+      unlock(i);
+      flyMagpie(CONFIG.cards[i].magpie);
+    }
+    if (e.target.id === 'act4'){
+      unlock(total-1);
+      spawnSparks();
+      setTimeout(()=>magpieSay('停——别搭了。五条记录本鹊都翻过了：你们根本不是一年一面'), 2000);
+      setTimeout(()=>{
+        e.target.classList.add('no-bridge');
+        spawnSparks();
+        const w = document.getElementById('meet-word');
+        if (w){ w.innerHTML = '桥不用搭了。规矩作废。<br>——往后，想见就见。'; }
+      }, 5000);
+    }
+  });
+},{threshold:.45});
+
+document.querySelectorAll('.mcard, #act4, #act6').forEach(el=>io.observe(el));
+
+// 顶栏显隐
+new IntersectionObserver(es=>{
+  bar.classList.toggle('show', !es[0].isIntersecting);
+},{threshold:.2}).observe(document.getElementById('act1'));
+
+// 喜鹊
+let magpieTimer = null;
+function flyMagpie(text){
+  const m = document.getElementById('magpie');
+  if (magpieTimer) return;                 // 一只喜鹊一次只送一封信
+  document.getElementById('magpie-say').textContent = text;
+  m.classList.remove('fly'); void m.offsetWidth; m.classList.add('fly');
+  magpieTimer = setTimeout(()=>{ m.classList.remove('fly'); magpieTimer = null; }, 5200);
+}
+function magpieSay(text){          // 喜鹊忙就排队，别吞台词
+  if (magpieTimer){ setTimeout(()=>magpieSay(text), 800); return; }
+  flyMagpie(text);
+}
+
+// 开场：喜鹊先亮明天条
+setTimeout(()=>magpieSay('本鹊奉命监桥：天条规定，一年一面。下面开始查记录——'), 1600);
+
+// 相会星星
+function spawnSparks(){
+  const st = document.getElementById('meet-stage');
+  if (st.dataset.sparked) return;
+  st.dataset.sparked = 1;
+  for (let i=0;i<14;i++){
+    const s = document.createElement('span');
+    s.className = 'sparkle';
+    s.style.left = 20 + Math.random()*60 + '%';
+    s.style.top = 5 + Math.random()*45 + '%';
+    s.style.animationDelay = (Math.random()*2).toFixed(2) + 's';
+    s.style.width = s.style.height = (6 + Math.random()*10).toFixed(0) + 'px';
+    st.appendChild(s);
+  }
+}
+
+/* ============ 互动 ============ */
+function startJourney(){
+  document.getElementById('card-0').scrollIntoView({behavior:'smooth'});
+  playMusic();
+}
+function sayHi(id){
+  const q = CONFIG.capyQuotes[id === 'capy-l' ? 'left' : 'right'];
+  const text = Array.isArray(q) ? q[Math.floor(Math.random()*q.length)] : q;
+  const sp = document.getElementById('sp-' + id);
+  sp.textContent = text; sp.style.opacity = 1;
+  clearTimeout(sp._t); sp._t = setTimeout(()=> sp.style.opacity = 0, 2200);
+  // 任一只水豚被点过一次，就把两只的引导都隐了
+  document.querySelectorAll('.capy-wrap').forEach(el => el.classList.add('tapped'));
+}
+
+/* ============ 音乐 ============ */
+let bgm = null, musicOn = false;
+function playMusic(){
+  if (bgm || !CONFIG.musicSrc) return;
+  bgm = new Audio(CONFIG.musicSrc);
+  bgm.loop = true; bgm.volume = .4;
+  bgm.play().then(()=>{ musicOn = true; }).catch(()=>{ musicOn = false; });
+}
+function toggleMusic(){
+  if (!bgm){ playMusic(); return; }
+  musicOn = !musicOn;
+  if (musicOn) bgm.play().catch(()=>{}); else bgm.pause();
+}
+
+/* ============ 视频 ============ */
+const vReal = document.getElementById('v-real'), missReal = document.getElementById('miss-real');
+if (CONFIG.videos.real){
+  vReal.src = CONFIG.videos.real;
+  vReal.addEventListener('error', ()=> missReal.style.display = 'flex');
+  vReal.addEventListener('loadeddata', ()=> missReal.style.display = 'none');
+  // 进入视口自动播放（静音循环），离开暂停
+  new IntersectionObserver(es=>{
+    es.forEach(e=>{ e.isIntersecting ? vReal.play().catch(()=>{}) : vReal.pause(); });
+  },{threshold:.5}).observe(vReal);
+} else { vReal.removeAttribute('id'); missReal.style.display = 'flex'; }
+function toggleVidSound(){
+  vReal.muted = !vReal.muted;
+  document.getElementById('v-sound').textContent = vReal.muted ? '♪' : '♪♪';
+}
+const vCute = document.getElementById('v-cute'), missCute = document.getElementById('miss-cute'), cuteSlot = document.getElementById('cute-slot');
+if (CONFIG.videos.cute){
+  cuteSlot.style.display = 'block';
+  vCute.src = CONFIG.videos.cute;
+  vCute.addEventListener('error', ()=> missCute.style.display = 'flex');
+  vCute.addEventListener('loadeddata', ()=> missCute.style.display = 'none');
+} else { cuteSlot.style.display = 'none'; }
+
+/* ============ 第六幕 · 备案 ============ */
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderWish(v){
+  document.getElementById('future-body').innerHTML =
+    `<p class="wish-done">「${esc(v)}」</p><p class="wish-note">已备案 · 喜鹊保管中 · 明年七夕来对账</p>`;
+}
+function submitWish(){
+  const el = document.getElementById('wish-input');
+  const v = el ? el.value.trim() : '';
+  if (!v){ magpieSay('空的备案本鹊没法收——写点什么再交'); return; }
+  try{ localStorage.setItem('wish06', v); }catch(e){}
+  renderWish(v);
+  magpieSay('收到，已备案。这条不上报天庭——就我们仨知道');
+  // 服务端落盘（fire-and-forget）：失败静默，不打断体验
+  try{
+    if (CONFIG.wishEndpoint){
+      fetch(CONFIG.wishEndpoint, {
+        method: 'POST',
+        body: JSON.stringify({ wish: v, at: new Date().toISOString() })
+      }).catch(()=>{});
+    }
+  }catch(e){}
+}
+try{
+  const saved = localStorage.getItem('wish06');
+  if (saved) renderWish(saved);
+}catch(e){}
+</script>
+</body>
+</html>
